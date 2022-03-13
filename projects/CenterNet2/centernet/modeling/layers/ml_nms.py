@@ -1,4 +1,6 @@
-from detectron2.layers import batched_nms
+import torchvision
+
+# from detectron2.layers import batched_nms
 
 
 def ml_nms(boxlist, nms_thresh, max_proposals=-1,
@@ -24,7 +26,7 @@ def ml_nms(boxlist, nms_thresh, max_proposals=-1,
             len(boxlist.proposal_boxes.tensor))
     scores = boxlist.scores
     
-    keep = batched_nms(boxes, scores, labels, nms_thresh)
+    keep = torchvision.ops.batched_nms(boxes, scores, labels, nms_thresh)
     if max_proposals > 0:
         keep = keep[: max_proposals]
     boxlist = boxlist[keep]

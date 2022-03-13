@@ -74,6 +74,7 @@ class CenterNet(nn.Module):
         centernet_head=None,
     ):
         super().__init__()
+        self.onnx_export = False
         self.num_classes = num_classes
         self.in_features = in_features
         self.strides = strides
@@ -181,8 +182,13 @@ class CenterNet(nn.Module):
         clss_per_level, reg_pred_per_level, agn_hm_pred_per_level = \
             self.centernet_head(features)
         grids = self.compute_grids(features)
-        shapes_per_level = grids[0].new_tensor(
-                    [(x.shape[2], x.shape[3]) for x in reg_pred_per_level])
+        if self.onnx_export:
+            shapes_per_level = torch.stack([
+                torch.stack([x.shape[2], x.shape[3]]) for x in reg_pred_per_level
+            ], dim=0)
+        else:
+            shapes_per_level = grids[0].new_tensor(
+                        [(x.shape[2], x.shape[3]) for x in reg_pred_per_level])
         
         if not self.training:
             return self.inference(
@@ -718,7 +724,7 @@ class CenterNet(nn.Module):
             num_dets = len(result)
             post_nms_topk = self.post_nms_topk_train if self.training else \
                 self.post_nms_topk_test
-            if num_dets > post_nms_topk:
+            if self.onnx_export or num_dets > post_nms_topk:
                 cls_scores = result.scores
                 image_thresh, _ = torch.kthvalue(
                     cls_scores.float().cpu(),
