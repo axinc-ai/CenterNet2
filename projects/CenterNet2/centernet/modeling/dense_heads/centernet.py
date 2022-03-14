@@ -684,7 +684,7 @@ class CenterNet(nn.Module):
 
             per_pre_nms_top_n = pre_nms_top_n[i] # 1
 
-            if per_candidate_inds.sum().item() > per_pre_nms_top_n.item():
+            if self.onnx_export or per_candidate_inds.sum().item() > per_pre_nms_top_n.item():
                 per_box_cls, top_k_indices = \
                     per_box_cls.topk(per_pre_nms_top_n, sorted=False)
                 per_class = per_class[top_k_indices]
@@ -726,13 +726,10 @@ class CenterNet(nn.Module):
                 self.post_nms_topk_test
             if self.onnx_export or num_dets > post_nms_topk:
                 cls_scores = result.scores
-                image_thresh, _ = torch.kthvalue(
-                    cls_scores.float().cpu(),
-                    num_dets - post_nms_topk + 1
-                )
-                keep = cls_scores >= image_thresh.item()
-                keep = torch.nonzero(keep).squeeze(1)
-                result = result[keep]
+                inds_sorted = cls_scores.sort(0, descending=True)[1]
+                device = inds_sorted.device
+                inds_sorted = inds_sorted.index_select(0, torch.arange(post_nms_topk, device=device))
+                result = result[inds_sorted]
             if self.debug:
                 print('#proposals after filter', len(result))
             results.append(result)
